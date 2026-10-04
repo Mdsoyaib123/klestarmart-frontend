@@ -3,8 +3,10 @@ import MainLayout from '@/components/layout/MainLayout'
 import Cart from '@/pages/Cart'
 import Checkout from '@/pages/Checkout'
 import Home from '@/pages/Home'
+import Login from '@/pages/Login'
 import NotFound from '@/pages/NotFound'
 import ProductDetail from '@/pages/ProductDetail'
+import Register from '@/pages/Register'
 import Shop from '@/pages/Shop'
 import Wishlist from '@/pages/Wishlist'
 
@@ -19,6 +21,8 @@ function AppRoutes() {
         <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

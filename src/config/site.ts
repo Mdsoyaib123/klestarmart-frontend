@@ -4,8 +4,8 @@ export const CURRENCY_SYMBOL = '৳'
 export const FREE_SHIPPING_THRESHOLD = 3000
 
 export const DELIVERY_RATES = {
-  dhaka: { label: 'Inside Dhaka', fee: 60, eta: '1-2 days' },
-  outside: { label: 'Outside Dhaka', fee: 120, eta: '3-5 days' },
+  dhaka: { label: 'Inside Dhaka', fee: 60, eta: '1-2 days', days: [1, 2] },
+  outside: { label: 'Outside Dhaka', fee: 120, eta: '3-5 days', days: [3, 5] },
 } as const
 
 export type DeliveryRegion = keyof typeof DELIVERY_RATES

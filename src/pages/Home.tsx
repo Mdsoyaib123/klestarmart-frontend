@@ -34,21 +34,25 @@ export default function Home() {
 
       <Container className="pt-16">
         <SectionHeading title="Shop by category" to="/shop" label="All products" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
           {categories.map((category) => {
             const Icon = categoryIcon(category.slug)
-            const count = products.filter((product) => product.category === category.slug).length
             return (
               <Link
                 key={category.slug}
                 to={`/category/${category.slug}`}
-                className="group rounded-2xl border border-line bg-white p-5 transition hover:border-brand hover:shadow-sm"
+                className="group min-w-0 text-center"
               >
-                <span className={`mb-4 grid h-12 w-12 place-items-center rounded-full ${categoryTone(category.slug)}`}>
-                  <Icon className="h-6 w-6" strokeWidth={1.4} />
+                <span className={`relative block aspect-square overflow-hidden rounded-2xl border border-line/80 ${categoryTone(category.slug)}`}>
+                  {category.imageUrl ? (
+                    <img src={category.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                  ) : (
+                    <span className="absolute inset-0 grid place-items-center text-ink/50">
+                      <Icon className="h-10 w-10" strokeWidth={1.3} />
+                    </span>
+                  )}
                 </span>
-                <p className="font-medium">{category.name}</p>
-                <p className="text-sm text-muted">{count ? `${count} products` : 'Explore'}</p>
+                <span className="mt-2.5 block truncate font-medium text-ink transition group-hover:text-brand">{category.name}</span>
               </Link>
             )
           })}

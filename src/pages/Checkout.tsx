@@ -1,9 +1,8 @@
-import { CheckCircle2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { useAppSelector } from '@/app/hooks'
 import { DELIVERY_RATES, FREE_SHIPPING_THRESHOLD, type DeliveryRegion } from '@/config/site'
-import { clearCart, selectCartItems, selectCartSubtotal, shippingFor } from '@/features/cart/cartSlice'
+import { selectCartItems, selectCartSubtotal, shippingFor } from '@/features/cart/cartSlice'
 import { formatPrice } from '@/lib/format'
 import Container from '@/components/ui/Container'
 import ProductImage from '@/components/product/ProductImage'
@@ -52,34 +51,15 @@ function Field({
 }
 
 export default function Checkout() {
-  const dispatch = useAppDispatch()
   const items = useAppSelector(selectCartItems)
   const subtotal = useAppSelector(selectCartSubtotal)
   const [region, setRegion] = useState<DeliveryRegion>('dhaka')
   const shipping = shippingFor(subtotal, region)
-  const [orderNumber, setOrderNumber] = useState<string | null>(null)
+  const [submissionNotice, setSubmissionNotice] = useState(false)
 
   const placeOrder = (event: FormEvent) => {
     event.preventDefault()
-    // No order API yet: the order is only confirmed locally.
-    setOrderNumber(`KM-${Date.now().toString().slice(-7)}`)
-    dispatch(clearCart())
-    window.scrollTo(0, 0)
-  }
-
-  if (orderNumber) {
-    return (
-      <Container className="flex flex-col items-center py-24 text-center">
-        <CheckCircle2 className="h-14 w-14 text-brand" strokeWidth={1.3} />
-        <h1 className="mt-5 font-display text-3xl font-semibold sm:text-4xl">Thank you for your order</h1>
-        <p className="mt-3 max-w-md text-muted">
-          Your order <strong className="text-ink">{orderNumber}</strong> has been placed. You will pay when it arrives at your door.
-        </p>
-        <Link to="/shop" className="mt-8 rounded-full bg-brand px-8 py-3 font-medium text-white hover:bg-brand-dark">
-          Continue shopping
-        </Link>
-      </Container>
-    )
+    setSubmissionNotice(true)
   }
 
   if (items.length === 0) {
@@ -97,6 +77,15 @@ export default function Checkout() {
   return (
     <Container className="py-8 sm:py-12">
       <h1 className="mb-8 font-display text-3xl font-semibold sm:text-4xl">Checkout</h1>
+      <p role="note" className="mb-8 rounded-2xl border border-accent/20 bg-accent-soft px-5 py-4 text-sm text-ink">
+        Preview only: checkout is not connected. Do not enter real personal details. No order or information will be sent or saved.
+      </p>
+
+      {submissionNotice && (
+        <p role="status" className="mb-6 rounded-xl bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
+          No order was placed. The checkout service is not connected, and your bag is unchanged.
+        </p>
+      )}
 
       <form onSubmit={placeOrder} className="grid gap-10 lg:grid-cols-[1fr_400px]">
         <div className="space-y-10">

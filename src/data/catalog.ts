@@ -1,3 +1,5 @@
+import { specsByName } from '@/data/specs'
+import { sampleProductImage } from '@/data/productImages'
 import type { Category, Product } from '@/types/catalog'
 
 export const categories: Category[] = [
@@ -5,30 +7,35 @@ export const categories: Category[] = [
     slug: 'clothing',
     name: 'Clothing',
     description: 'Easy, well-cut everyday pieces in natural fabrics.',
+    imageUrl: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&h=1100&q=82',
     highlights: ['Pre-washed for a soft hand-feel', 'Machine washable at 30°C', 'Cut to a true-to-size fit'],
   },
   {
     slug: 'beauty',
     name: 'Beauty',
     description: 'Skincare, colour and haircare that earn a place in your routine.',
+    imageUrl: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?auto=format&fit=crop&w=900&h=1100&q=82',
     highlights: ['Dermatologist tested', 'Cruelty-free formulas', 'Free from parabens and sulphates'],
   },
   {
     slug: 'electronics',
     name: 'Electronics',
     description: 'Dependable gadgets and accessories for work, travel and home.',
+    imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&h=1100&q=82',
     highlights: ['12-month manufacturer warranty', 'Includes cable and quick-start guide', 'Tested before dispatch'],
   },
   {
     slug: 'home-living',
     name: 'Home & Living',
     description: 'Calm, considered pieces for every room.',
+    imageUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&h=1100&q=82',
     highlights: ['Made from durable, natural materials', 'Easy to clean and care for', 'Packed to arrive safely'],
   },
   {
     slug: 'accessories',
     name: 'Accessories',
     description: 'Bags, eyewear, watches and the small things that finish a look.',
+    imageUrl: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&h=1100&q=82',
     highlights: ['Hardwearing materials', 'Designed to age well', 'Gift-ready packaging'],
   },
 ]
@@ -40,7 +47,7 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 
-const raw: Omit<Product, 'id'>[] = [
+const raw: Omit<Product, 'id' | 'sku' | 'specs'>[] = [
   // Clothing
   { name: 'Relaxed Linen Shirt', brand: 'Alder & Co', category: 'clothing', price: 48, rating: 4.6, reviewCount: 128, stock: 24, badge: 'New', description: 'A breathable, softly structured shirt in washed European linen. Wear it buttoned up or open over a tee.' },
   { name: 'Heavyweight Cotton Tee', brand: 'Alder & Co', category: 'clothing', price: 28, rating: 4.8, reviewCount: 412, stock: 60, badge: 'Bestseller', description: 'A dense 220gsm tee that holds its shape wash after wash, with a clean crew neckline.' },
@@ -81,9 +88,18 @@ const raw: Omit<Product, 'id'>[] = [
 // Sample prices above are written on a small scale; this converts them to realistic taka amounts.
 const toTaka = (value: number) => Math.round((value * 50) / 10) * 10
 
-export const products: Product[] = raw.map((item) => ({
-  ...item,
-  id: slugify(item.name),
-  price: toTaka(item.price),
-  compareAtPrice: item.compareAtPrice ? toTaka(item.compareAtPrice) : undefined,
-}))
+const perCategory: Record<string, number> = {}
+
+export const products: Product[] = raw.map((item) => {
+  perCategory[item.category] = (perCategory[item.category] ?? 0) + 1
+  const prefix = item.category.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase()
+  return {
+    ...item,
+    id: slugify(item.name),
+    imageUrl: sampleProductImage(item.name),
+    sku: `KM-${prefix}-${String(perCategory[item.category]).padStart(3, '0')}`,
+    specs: specsByName[item.name] ?? [],
+    price: toTaka(item.price),
+    compareAtPrice: item.compareAtPrice ? toTaka(item.compareAtPrice) : undefined,
+  }
+})

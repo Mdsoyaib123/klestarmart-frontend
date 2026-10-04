@@ -35,10 +35,11 @@ export default function Shop() {
   const price = params.get('price') ?? ''
   const inStock = params.get('stock') === '1'
   const deals = params.get('deals') === '1'
+  const brandParam = params.get('brand') ?? ''
   const category = categories.find((item) => item.slug === slug)
 
   // The page size resets whenever the active filters change.
-  const filterKey = [slug, q, sort, price, inStock, deals].join('|')
+  const filterKey = [slug, q, sort, price, inStock, deals, brandParam].join('|')
   const visible = pageState.key === filterKey ? pageState.count : PAGE_SIZE
 
   const update = (key: string, value: string | null) => {
@@ -48,28 +49,41 @@ export default function Shop() {
     setParams(next, { replace: true })
   }
 
-  const results = useMemo(() => {
-    const range = priceRanges.find((item) => item.id === price)
-    const term = q.toLowerCase()
-    const list = products.filter(
-      (product) =>
-        (!slug || product.category === slug) &&
-        (!term || `${product.name} ${product.brand}`.toLowerCase().includes(term)) &&
-        (!range || (product.price >= range.min && product.price < range.max)) &&
-        (!inStock || product.stock > 0) &&
-        (!deals || product.compareAtPrice),
-    )
-    if (sort === 'price-asc') list.sort((a, b) => a.price - b.price)
-    if (sort === 'price-desc') list.sort((a, b) => b.price - a.price)
-    if (sort === 'rating') list.sort((a, b) => b.rating - a.rating)
-    return list
-  }, [products, slug, q, price, inStock, deals, sort])
+  const brandCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const product of products) {
+      if (!slug || product.category === slug) counts.set(product.brand, (counts.get(product.brand) ?? 0) + 1)
+    }
+    return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [products, slug])
+
+  const toggleBrand = (brand: string) => {
+    const current = brandParam.split(',').filter(Boolean)
+    const next = current.includes(brand) ? current.filter((item) => item !== brand) : [...current, brand]
+    update('brand', next.length ? next.join(',') : null)
+  }
+
+  const priceRange = priceRanges.find((item) => item.id === price)
+  const searchTerm = q.toLowerCase()
+  const results = products.filter(
+    (product) =>
+      (!slug || product.category === slug) &&
+      (!searchTerm || `${product.name} ${product.brand}`.toLowerCase().includes(searchTerm)) &&
+      (!brandParam || brandParam.split(',').includes(product.brand)) &&
+      (!priceRange || (product.price >= priceRange.min && product.price < priceRange.max)) &&
+      (!inStock || product.stock > 0) &&
+      (!deals || product.compareAtPrice),
+  )
+  if (sort === 'price-asc') results.sort((a, b) => a.price - b.price)
+  if (sort === 'price-desc') results.sort((a, b) => b.price - a.price)
+  if (sort === 'rating') results.sort((a, b) => b.rating - a.rating)
 
   if (slug && categoriesLoaded && !category) return <NotFound />
 
   const title = category?.name ?? (deals ? 'Sale' : q ? `Results for "${q}"` : 'All products')
   const description = category?.description ?? (deals ? 'Reduced prices on selected favourites.' : 'Browse everything in the store.')
-  const hasFilters = Boolean(price || inStock || (deals && !category) || q)
+  const hasFilters = Boolean(price || inStock || brandParam || (deals && !category) || q)
+  const activeBrands = brandParam.split(',').filter(Boolean)
   const optionClass = 'flex items-center gap-2.5 py-1.5 text-sm'
 
   const filters = (
@@ -91,6 +105,19 @@ export default function Shop() {
           ))}
         </ul>
       </div>
+
+      {brandCounts.length > 1 && (
+        <fieldset>
+          <legend className="mb-2 text-sm font-semibold">Brand</legend>
+          {brandCounts.map(([brand, count]) => (
+            <label key={brand} className={optionClass}>
+              <input type="checkbox" checked={activeBrands.includes(brand)} onChange={() => toggleBrand(brand)} className="accent-brand" />
+              <span className="flex-1">{brand}</span>
+              <span className="text-xs text-muted">{count}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       <fieldset>
         <legend className="mb-2 text-sm font-semibold">Price</legend>
@@ -130,9 +157,36 @@ export default function Shop() {
         <span className="text-ink">{category ? category.name : 'Shop'}</span>
       </nav>
 
-      <div className="mb-8 max-w-2xl">
-        <h1 className="font-display text-3xl font-semibold sm:text-4xl">{title}</h1>
-        <p className="mt-2 text-muted">{description}</p>
+      <div className={`relative mb-8 overflow-hidden rounded-3xl ${category?.imageUrl ? 'isolate min-h-64 bg-brand text-white' : 'max-w-2xl'}`}>
+        {category?.imageUrl && (
+          <>
+            <img src={category.imageUrl} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover" />
+            <span className="absolute inset-0 -z-10 bg-gradient-to-r from-ink/90 via-ink/60 to-ink/10" />
+          </>
+        )}
+        <div className={category?.imageUrl ? 'max-w-3xl p-6 sm:p-9' : ''}>
+          <h1 className="font-display text-3xl font-semibold sm:text-4xl">{title}</h1>
+          <p className={`mt-2 ${category?.imageUrl ? 'text-white/80' : 'text-muted'}`}>{description}</p>
+          {category && brandCounts.length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Brands:</span>
+              {brandCounts.map(([brand]) => {
+                const active = activeBrands.includes(brand)
+                return (
+                  <button
+                    key={brand}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleBrand(brand)}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${active ? 'border-white bg-white text-brand' : 'border-white/50 bg-white/10 text-white hover:bg-white/20'}`}
+                  >
+                    {brand}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[220px_1fr]">

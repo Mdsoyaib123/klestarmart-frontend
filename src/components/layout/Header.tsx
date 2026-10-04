@@ -1,26 +1,27 @@
-import { Heart, Menu, Search, ShoppingBag, X } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { Flame, Heart, LayoutGrid, LogIn, Search, ShoppingBag } from 'lucide-react'
+import { createElement, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAppSelector } from '@/app/hooks'
 import { useGetCategoriesQuery, useGetProductsQuery } from '@/features/catalog/catalogApi'
 import { selectCartCount } from '@/features/cart/cartSlice'
 import { selectWishlistIds } from '@/features/wishlist/wishlistSlice'
-import { openCart } from '@/features/ui/uiSlice'
 import { FREE_SHIPPING_THRESHOLD, SITE_NAME } from '@/config/site'
+import { categoryIcon } from '@/lib/category'
 import { formatPrice } from '@/lib/format'
 import Container from '@/components/ui/Container'
 import Logo from '@/components/ui/Logo'
 
-const iconButton = 'relative grid h-10 w-10 place-items-center rounded-full transition hover:bg-cream'
+const iconButton =
+  'relative grid h-11 w-11 place-items-center rounded-full border border-line bg-white transition hover:border-brand hover:text-brand'
+const badge = 'absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-semibold text-white'
 
 export default function Header() {
-  const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const { pathname, search } = useLocation()
   const { data: categories = [] } = useGetCategoriesQuery()
   const { data: products = [] } = useGetProductsQuery()
   const cartCount = useAppSelector(selectCartCount)
   const wishlistCount = useAppSelector(selectWishlistIds).length
-  const [menuOpen, setMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
 
@@ -28,153 +29,133 @@ export default function Header() {
   const suggestions =
     term.length >= 2 ? products.filter((product) => `${product.name} ${product.brand}`.toLowerCase().includes(term)).slice(0, 5) : []
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setMenuOpen(false)
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = ''
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
-
   const onSearch = (event: FormEvent) => {
     event.preventDefault()
-    const term = query.trim()
-    navigate(term ? `/shop?q=${encodeURIComponent(term)}` : '/shop')
+    const value = query.trim()
+    navigate(value ? `/shop?q=${encodeURIComponent(value)}` : '/shop')
     setFocused(false)
-    setMenuOpen(false)
   }
 
-  const navLink = ({ isActive }: { isActive: boolean }) =>
-    `border-b-2 py-3 text-sm font-medium transition ${isActive ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'}`
+  const onDeals = pathname === '/shop' && search.includes('deals=1')
+  const onAll = pathname === '/shop' && !onDeals
 
-  const searchForm = (
-    <form
-      onSubmit={onSearch}
-      role="search"
-      className="relative w-full"
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
-      }}
-    >
-      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-      <input
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search for products or brands"
-        aria-label="Search products"
-        className="h-11 w-full rounded-full border border-line bg-white pl-11 pr-4 text-sm outline-none transition placeholder:text-muted focus:border-brand"
-      />
-      {focused && suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
-          {suggestions.map((product) => (
-            <li key={product.id}>
-              <Link
-                to={`/product/${product.id}`}
-                onClick={() => {
-                  setQuery('')
-                  setFocused(false)
-                  setMenuOpen(false)
-                }}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-cream"
-              >
-                <span className="truncate">{product.name}</span>
-                <span className="shrink-0 font-medium">{formatPrice(product.price)}</span>
-              </Link>
-            </li>
-          ))}
-          <li>
-            <button type="submit" className="w-full border-t border-line px-4 py-2.5 text-left text-sm font-medium text-brand hover:bg-cream">
-              See all results for &ldquo;{query.trim()}&rdquo;
-            </button>
-          </li>
-        </ul>
-      )}
-    </form>
-  )
+  const chip = (active: boolean, tone = 'bg-cream text-ink hover:bg-sand') =>
+    `inline-flex shrink-0 items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-medium transition ${
+      active ? 'bg-brand text-white shadow-sm' : tone
+    }`
+  const chipIcon = (active: boolean) =>
+    `grid h-7 w-7 place-items-center rounded-full ${active ? 'bg-white/20' : 'bg-white text-brand'}`
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur">
-      <div className="bg-brand py-2 text-center text-xs text-white">
+    <>
+      <div className="bg-brand px-4 py-2 text-center text-xs text-white">
         Free delivery on orders over {formatPrice(FREE_SHIPPING_THRESHOLD)} &nbsp;&middot;&nbsp; Cash on delivery available
       </div>
 
-      <Container>
-        <div className="flex h-16 items-center gap-4">
-          <button type="button" aria-label="Open menu" className={`${iconButton} -ml-2 lg:hidden`} onClick={() => setMenuOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </button>
-
-          <Link to="/" aria-label={`${SITE_NAME} home`} className="shrink-0">
-            <Logo className="h-11" />
-          </Link>
-
-          <div className="mx-auto hidden w-full max-w-md md:block">{searchForm}</div>
-
-          <div className="ml-auto flex items-center gap-1 md:ml-0">
-            <Link to="/wishlist" aria-label="Wishlist" className={iconButton}>
-              <Heart className="h-5 w-5" />
-              {wishlistCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
-                  {wishlistCount}
-                </span>
-              )}
+      <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
+        <Container>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:flex-nowrap md:gap-x-6">
+            <Link to="/" aria-label={`${SITE_NAME} home`} className="order-1 shrink-0">
+              <Logo className="h-10 sm:h-11" />
             </Link>
-            <button type="button" aria-label={`Open bag, ${cartCount} items`} className={iconButton} onClick={() => dispatch(openCart())}>
-              <ShoppingBag className="h-5 w-5" />
-              {cartCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
+
+            <form
+              onSubmit={onSearch}
+              role="search"
+              className="relative order-3 w-full md:order-2 md:mx-auto md:max-w-xl md:flex-1"
+              onFocus={() => setFocused(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+              }}
+            >
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search for products or brands"
+                aria-label="Search products"
+                className="h-12 w-full rounded-full border border-transparent bg-cream pl-5 pr-14 text-sm outline-none transition placeholder:text-muted focus:border-brand focus:bg-white"
+              />
+              <button
+                type="submit"
+                aria-label="Search"
+                className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-brand text-white transition hover:bg-brand-dark"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+
+              {focused && suggestions.length > 0 && (
+                <ul className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+                  {suggestions.map((product) => (
+                    <li key={product.id}>
+                      <Link
+                        to={`/product/${product.id}`}
+                        onClick={() => {
+                          setQuery('')
+                          setFocused(false)
+                        }}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-cream"
+                      >
+                        <span className="truncate">{product.name}</span>
+                        <span className="shrink-0 font-medium">{formatPrice(product.price)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <button type="submit" className="w-full border-t border-line px-4 py-2.5 text-left text-sm font-medium text-brand hover:bg-cream">
+                      See all results for &ldquo;{query.trim()}&rdquo;
+                    </button>
+                  </li>
+                </ul>
               )}
-            </button>
-          </div>
-        </div>
+            </form>
 
-        <nav aria-label="Categories" className="hidden items-center gap-7 lg:flex">
-          <NavLink to="/shop" end className={navLink}>
-            All products
-          </NavLink>
-          {categories.map((category) => (
-            <NavLink key={category.slug} to={`/category/${category.slug}`} className={navLink}>
-              {category.name}
-            </NavLink>
-          ))}
-          <NavLink to="/shop?deals=1" className="py-3 text-sm font-medium text-accent hover:underline">
-            Sale
-          </NavLink>
-        </nav>
-      </Container>
-
-      <div className={`fixed inset-0 z-50 lg:hidden ${menuOpen ? '' : 'pointer-events-none'}`}>
-        <div className={`absolute inset-0 bg-ink/40 transition-opacity ${menuOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMenuOpen(false)} />
-        <aside
-          aria-hidden={!menuOpen}
-          inert={!menuOpen}
-          className={`absolute inset-y-0 left-0 flex w-[85%] max-w-sm flex-col bg-paper p-5 shadow-xl transition-transform duration-300 ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        >
-          <div className="mb-5 flex items-center justify-between">
-            <Logo className="h-9" />
-            <button type="button" aria-label="Close menu" className={iconButton} onClick={() => setMenuOpen(false)}>
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          {searchForm}
-          <nav aria-label="Categories" onClick={() => setMenuOpen(false)} className="mt-6 flex flex-col divide-y divide-line">
-            <Link to="/shop" className="py-3.5 font-medium">All products</Link>
-            {categories.map((category) => (
-              <Link key={category.slug} to={`/category/${category.slug}`} className="py-3.5 font-medium">
-                {category.name}
+            <div className="order-2 ml-auto flex items-center gap-2 md:order-3 md:ml-0">
+              <Link to="/wishlist" aria-label="Wishlist" className={iconButton}>
+                <Heart className="h-5 w-5" />
+                {wishlistCount > 0 && <span className={`${badge} bg-accent`}>{wishlistCount}</span>}
               </Link>
-            ))}
-            <Link to="/shop?deals=1" className="py-3.5 font-medium text-accent">Sale</Link>
+              <Link to="/cart" aria-label={`View shopping bag, ${cartCount} items`} className={iconButton}>
+                <ShoppingBag className="h-5 w-5" />
+                {cartCount > 0 && <span className={`${badge} bg-brand`}>{cartCount}</span>}
+              </Link>
+              <Link
+                to="/login"
+                className="ml-1 inline-flex h-11 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark sm:px-5"
+              >
+                <LogIn className="h-4 w-4" />
+                Login
+              </Link>
+            </div>
+          </div>
+
+          <nav aria-label="Categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+            <Link to="/shop" aria-current={onAll ? 'page' : undefined} className={chip(onAll)}>
+              <span className={chipIcon(onAll)}>
+                <LayoutGrid className="h-4 w-4" />
+              </span>
+              All products
+            </Link>
+
+            {categories.map((category) => {
+              const active = pathname === `/category/${category.slug}`
+              return (
+                <Link key={category.slug} to={`/category/${category.slug}`} aria-current={active ? 'page' : undefined} className={chip(active)}>
+                  <span className={chipIcon(active)}>{createElement(categoryIcon(category.slug), { className: 'h-4 w-4' })}</span>
+                  {category.name}
+                </Link>
+              )
+            })}
+
+            <Link to="/shop?deals=1" aria-current={onDeals ? 'page' : undefined} className={chip(onDeals, 'bg-accent-soft text-accent hover:bg-[#ffe1cc]')}>
+              <span className={`grid h-7 w-7 place-items-center rounded-full ${onDeals ? 'bg-white/20' : 'bg-white text-accent'}`}>
+                <Flame className="h-4 w-4" />
+              </span>
+              Sale
+            </Link>
           </nav>
-        </aside>
-      </div>
-    </header>
+        </Container>
+      </header>
+    </>
   )
 }

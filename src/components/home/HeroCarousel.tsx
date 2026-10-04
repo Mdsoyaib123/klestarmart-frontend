@@ -34,12 +34,18 @@ function CollageTile({ category, className }: { category: Category; className: s
   return (
     <Link
       to={`/category/${category.slug}`}
-      className={`group absolute flex aspect-[4/5] flex-col items-center justify-center gap-3 rounded-3xl shadow-xl shadow-black/10 ring-4 ring-white/70 transition duration-300 hover:-translate-y-2 hover:rotate-0 ${categoryTone(category.slug)} ${className}`}
+      className={`group absolute flex aspect-[4/5] flex-col overflow-hidden rounded-3xl bg-white p-2 shadow-xl shadow-black/10 ring-4 ring-white/70 transition duration-300 hover:-translate-y-2 hover:rotate-0 ${className}`}
     >
-      <span className="grid h-16 w-16 place-items-center rounded-full bg-white/60 transition group-hover:scale-110">
-        {createElement(categoryIcon(category.slug), { className: 'h-8 w-8', strokeWidth: 1.3 })}
+      <span className={`relative min-h-0 flex-1 overflow-hidden rounded-2xl ${categoryTone(category.slug)}`}>
+        {category.imageUrl ? (
+          <img src={category.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        ) : (
+          <span className="absolute inset-0 grid place-items-center text-ink/60">
+            {createElement(categoryIcon(category.slug), { className: 'h-10 w-10', strokeWidth: 1.3 })}
+          </span>
+        )}
       </span>
-      <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-ink">{category.name}</span>
+      <span className="truncate px-1 pt-2 text-center text-xs font-semibold text-ink">{category.name}</span>
     </Link>
   )
 }
