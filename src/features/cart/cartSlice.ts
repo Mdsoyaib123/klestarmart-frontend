@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import { DELIVERY_RATES, FREE_SHIPPING_THRESHOLD, type DeliveryRegion } from '@/config/site'
+import { DELIVERY_RATES, FREE_SHIPPING_THRESHOLD, INSIDE_DHAKA_DISTRICTS, type DeliveryRegion } from '@/config/site'
 import type { RootState } from '@/app/store'
 import type { Product } from '@/types/catalog'
 
@@ -68,5 +68,8 @@ export const selectCartCount = (state: RootState) =>
 export const selectCartSubtotal = (state: RootState) =>
   state.cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-export const shippingFor = (subtotal: number, region: DeliveryRegion = 'dhaka') =>
+export const regionForDistrict = (district: string): DeliveryRegion =>
+  INSIDE_DHAKA_DISTRICTS.includes(district) ? 'dhaka' : 'outside'
+
+export const shippingFor =(subtotal: number, region: DeliveryRegion = 'dhaka') =>
   subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : DELIVERY_RATES[region].fee

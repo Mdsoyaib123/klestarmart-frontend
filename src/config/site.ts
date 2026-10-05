@@ -9,3 +9,6 @@ export const DELIVERY_RATES = {
 } as const
 
 export type DeliveryRegion = keyof typeof DELIVERY_RATES
+
+// Districts charged the inside-Dhaka rate; every other district uses the outside rate.
+export const INSIDE_DHAKA_DISTRICTS: readonly string[] = ['Dhaka']
