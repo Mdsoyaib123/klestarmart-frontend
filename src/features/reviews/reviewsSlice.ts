@@ -1,16 +1,18 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/app/store'
+import { isRecord, loadArray } from '@/lib/storage'
 import type { Review } from '@/types/catalog'
 
 export const REVIEWS_STORAGE_KEY = 'klestar:reviews'
 
-const load = (): Review[] => {
-  try {
-    return JSON.parse(localStorage.getItem(REVIEWS_STORAGE_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
+const isReview = (value: unknown): value is Review =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.productId === 'string' &&
+  typeof value.rating === 'number' &&
+  typeof value.date === 'string'
+
+const load = () => loadArray(REVIEWS_STORAGE_KEY, isReview)
 
 // Reviews written by the visitor are kept in the browser until the backend has a reviews API.
 const reviewsSlice = createSlice({

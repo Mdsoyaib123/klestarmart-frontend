@@ -1,16 +1,32 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { errorMessage } from '@/api/baseApi'
+import { useGetMeQuery, useLoginMutation } from '@/features/account/accountApi'
+import { useSiteSettings } from '@/features/settings/settingsApi'
 import Container from '@/components/ui/Container'
 
 const inputClass = 'h-12 w-full rounded-xl border border-line bg-white px-4 text-sm outline-none transition focus:border-brand'
 
 export default function Login() {
-  const [notice, setNotice] = useState(false)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/account'
+  const { data: me } = useGetMeQuery()
+  const { siteName } = useSiteSettings()
+  const [login, { isLoading }] = useLoginMutation()
 
-  const onSubmit = (event: FormEvent) => {
+  if (me) return <Navigate to={from} replace />
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // There is no auth API yet, so signing in is not wired up.
-    setNotice(true)
+    const form = new FormData(event.currentTarget)
+    setError('')
+    try {
+      await login({ identifier: String(form.get('identifier') ?? ''), password: String(form.get('password') ?? '') }).unwrap()
+      navigate(from, { replace: true })
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }
 
   return (
@@ -28,19 +44,18 @@ export default function Login() {
             <span className="mb-1.5 block text-sm font-medium">Password</span>
             <input name="password" type="password" autoComplete="current-password" required className={inputClass} />
           </label>
-          <button type="submit" className="h-12 w-full rounded-full bg-brand font-semibold text-white transition hover:bg-brand-dark">
-            Login
+          {error && (
+            <p role="alert" className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={isLoading} className="h-12 w-full rounded-full bg-brand font-semibold text-white transition hover:bg-brand-dark disabled:opacity-70">
+            {isLoading ? 'Logging in…' : 'Login'}
           </button>
         </form>
 
-        {notice && (
-          <p role="status" className="mt-5 rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
-            Customer accounts are not available yet. You can still shop and check out as a guest.
-          </p>
-        )}
-
         <p className="mt-6 text-center text-sm text-muted">
-          New to KlestarMart? <Link to="/register" className="font-semibold text-brand hover:underline">Create an account</Link>
+          New to {siteName}? <Link to="/register" className="font-semibold text-brand hover:underline">Create an account</Link>
         </p>
         <Link to="/shop" className="mt-6 block text-center text-sm font-medium text-brand hover:underline">
           Continue shopping

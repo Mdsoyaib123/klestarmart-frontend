@@ -4,14 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node api.js && vite",
+    "build": "node api.js && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",
-    "axios": "^1.20.0",
     "lucide-react": "^1.50.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

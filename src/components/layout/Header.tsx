@@ -1,11 +1,12 @@
-import { Flame, Heart, LayoutGrid, LogIn, Search, ShoppingBag } from 'lucide-react'
+import { Flame, Heart, LayoutGrid, LogIn, Search, ShoppingBag, UserRound } from 'lucide-react'
 import { createElement, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppSelector } from '@/app/hooks'
 import { useGetCategoriesQuery, useGetProductsQuery } from '@/features/catalog/catalogApi'
 import { selectCartCount } from '@/features/cart/cartSlice'
 import { selectWishlistIds } from '@/features/wishlist/wishlistSlice'
-import { FREE_SHIPPING_THRESHOLD, SITE_NAME } from '@/config/site'
+import { useGetMeQuery } from '@/features/account/accountApi'
+import { useSiteSettings } from '@/features/settings/settingsApi'
 import { categoryIcon } from '@/lib/category'
 import { formatPrice } from '@/lib/format'
 import Container from '@/components/ui/Container'
@@ -20,6 +21,8 @@ export default function Header() {
   const { pathname, search } = useLocation()
   const { data: categories = [] } = useGetCategoriesQuery()
   const { data: products = [] } = useGetProductsQuery()
+  const { siteName, announcement } = useSiteSettings()
+  const { data: me } = useGetMeQuery()
   const cartCount = useAppSelector(selectCartCount)
   const wishlistCount = useAppSelector(selectWishlistIds).length
   const [query, setQuery] = useState('')
@@ -48,14 +51,14 @@ export default function Header() {
 
   return (
     <>
-      <div className="bg-brand px-4 py-2 text-center text-xs text-white">
-        Free delivery on orders over {formatPrice(FREE_SHIPPING_THRESHOLD)} &nbsp;&middot;&nbsp; Cash on delivery available
-      </div>
+      {announcement.enabled && announcement.text && (
+        <div className="bg-brand px-4 py-2 text-center text-xs text-white">{announcement.text}</div>
+      )}
 
       <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
         <Container>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:flex-nowrap md:gap-x-6">
-            <Link to="/" aria-label={`${SITE_NAME} home`} className="order-1 shrink-0">
+            <Link to="/" aria-label={`${siteName} home`} className="order-1 shrink-0">
               <Logo className="h-10 sm:h-11" />
             </Link>
 
@@ -89,7 +92,7 @@ export default function Header() {
                   {suggestions.map((product) => (
                     <li key={product.id}>
                       <Link
-                        to={`/product/${product.id}`}
+                        to={`/product/${product.slug}`}
                         onClick={() => {
                           setQuery('')
                           setFocused(false)
@@ -119,13 +122,23 @@ export default function Header() {
                 <ShoppingBag className="h-5 w-5" />
                 {cartCount > 0 && <span className={`${badge} bg-brand`}>{cartCount}</span>}
               </Link>
-              <Link
-                to="/login"
-                className="ml-1 inline-flex h-11 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark sm:px-5"
-              >
-                <LogIn className="h-4 w-4" />
-                Login
-              </Link>
+              {me ? (
+                <Link
+                  to="/account"
+                  className="ml-1 inline-flex h-11 max-w-40 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold transition hover:border-brand hover:text-brand"
+                >
+                  <UserRound className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{me.name.split(' ')[0]}</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="ml-1 inline-flex h-11 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-dark sm:px-5"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </Link>
+              )}
             </div>
           </div>
 

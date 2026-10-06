@@ -1,9 +1,8 @@
 import { BadgeCheck, PenLine, ThumbsUp } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { useGetReviewsQuery } from '@/features/catalog/catalogApi'
 import { addReview, selectUserReviews } from '@/features/reviews/reviewsSlice'
-import { ratingDistribution } from '@/data/reviews'
+import { generateReviews, ratingDistribution } from '@/data/reviews'
 import { formatDate } from '@/lib/format'
 import Stars from '@/components/ui/Stars'
 import StarsInput from '@/components/ui/StarsInput'
@@ -22,7 +21,8 @@ const inputClass = 'w-full rounded-xl border border-line bg-white px-4 py-3 text
 
 export default function ReviewsSection({ product }: { product: Product }) {
   const dispatch = useAppDispatch()
-  const { data: sample = [], isLoading } = useGetReviewsQuery(product.id)
+  // Sample reviews until the backend has a reviews API; generated the same way on every visit.
+  const sample = useMemo(() => generateReviews(product), [product])
   const stored = useAppSelector(selectUserReviews)
   const [star, setStar] = useState<number | null>(null)
   const [sort, setSort] = useState('recent')
@@ -39,8 +39,9 @@ export default function ReviewsSection({ product }: { product: Product }) {
     count: row.count + mine.filter((review) => review.rating === row.star).length,
   }))
   const total = distribution.reduce((sum, row) => sum + row.count, 0)
-  const average = distribution.reduce((sum, row) => sum + row.star * row.count, 0) / total
-  const recommend = Math.round(((distribution[0].count + distribution[1].count) / total) * 100)
+  // Guard against products with no reviews yet, which would otherwise divide by zero.
+  const average = total ? distribution.reduce((sum, row) => sum + row.star * row.count, 0) / total : 0
+  const recommend = total ? Math.round(((distribution[0].count + distribution[1].count) / total) * 100) : 0
 
   const helpfulCount = (review: Review) => review.helpful + (voted.includes(review.id) ? 1 : 0)
   const shown = [...mine, ...sample].filter((review) => star === null || review.rating === star)
@@ -90,12 +91,14 @@ export default function ReviewsSection({ product }: { product: Product }) {
 
       <div className="mt-6 grid gap-8 rounded-3xl border border-line bg-white p-6 sm:p-8 md:grid-cols-[260px_1fr]">
         <div className="text-center md:text-left">
-          <p className="font-display text-5xl font-semibold">{average.toFixed(1)}</p>
+          <p className="font-display text-5xl font-semibold">{total ? average.toFixed(1) : '–'}</p>
           <div className="mt-2 flex justify-center md:justify-start">
             <Stars value={average} size="h-5 w-5" />
           </div>
-          <p className="mt-2 text-sm text-muted">Based on {total.toLocaleString()} reviews</p>
-          <p className="mt-1 text-sm font-medium text-success">{recommend}% of buyers recommend this</p>
+          <p className="mt-2 text-sm text-muted">
+            {total ? `Based on ${total.toLocaleString()} review${total === 1 ? '' : 's'}` : 'No reviews yet. Be the first to write one.'}
+          </p>
+          {total > 0 && <p className="mt-1 text-sm font-medium text-success">{recommend}% of buyers recommend this</p>}
           <button
             type="button"
             onClick={() => {
@@ -128,7 +131,7 @@ export default function ReviewsSection({ product }: { product: Product }) {
                   >
                     <span className="w-12 text-left font-medium">{value} star</span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-sand">
-                      <span className="block h-full rounded-full bg-amber-500" style={{ width: `${(count / total) * 100}%` }} />
+                      <span className="block h-full rounded-full bg-amber-500" style={{ width: `${total ? (count / total) * 100 : 0}%` }} />
                     </span>
                     <span className="w-10 text-right text-muted">{count}</span>
                   </button>
@@ -209,17 +212,7 @@ export default function ReviewsSection({ product }: { product: Product }) {
         </label>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-6 py-6" aria-busy="true">
-          {[0, 1, 2].map((item) => (
-            <div key={item} className="animate-pulse space-y-3">
-              <div className="h-4 w-1/4 rounded bg-sand/70" />
-              <div className="h-4 w-1/2 rounded bg-sand/70" />
-              <div className="h-12 rounded bg-sand/70" />
-            </div>
-          ))}
-        </div>
-      ) : shown.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="py-12 text-center text-muted">No reviews match this filter yet.</p>
       ) : (
         <>

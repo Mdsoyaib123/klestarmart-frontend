@@ -1,5 +1,5 @@
 import { ShoppingBag, Trash2, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
@@ -10,7 +10,7 @@ import {
   setQuantity,
 } from '@/features/cart/cartSlice'
 import { closeCart, selectCartOpen } from '@/features/ui/uiSlice'
-import { FREE_SHIPPING_THRESHOLD } from '@/config/site'
+import { useSiteSettings } from '@/features/settings/settingsApi'
 import { formatPrice } from '@/lib/format'
 import ProductImage from '@/components/product/ProductImage'
 import QuantityStepper from '@/components/ui/QuantityStepper'
@@ -21,16 +21,43 @@ export default function CartDrawer() {
   const items = useAppSelector(selectCartItems)
   const count = useAppSelector(selectCartCount)
   const subtotal = useAppSelector(selectCartSubtotal)
-  const remaining = FREE_SHIPPING_THRESHOLD - subtotal
+  const freeShippingThreshold = useSiteSettings().shipping.freeShippingThreshold
+  const remaining = freeShippingThreshold - subtotal
+
+  const panel = useRef<HTMLElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && dispatch(closeCart())
+    // Move focus into the dialog, keep Tab inside it, and hand focus back to the trigger on close.
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeButton.current?.focus()
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        dispatch(closeCart())
+        return
+      }
+      if (event.key !== 'Tab' || !panel.current) return
+      const focusable = panel.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
+      if (trigger?.isConnected) trigger.focus()
     }
   }, [open, dispatch])
 
@@ -41,6 +68,7 @@ export default function CartDrawer() {
       <div className={`absolute inset-0 bg-ink/40 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`} onClick={close} />
 
       <aside
+        ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label="Shopping bag"
@@ -50,7 +78,7 @@ export default function CartDrawer() {
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="font-display text-lg font-semibold">Your bag ({count})</h2>
-          <button type="button" aria-label="Close bag" onClick={close} className="grid h-9 w-9 place-items-center rounded-full hover:bg-cream">
+          <button ref={closeButton} type="button" aria-label="Close bag" onClick={close} className="grid h-9 w-9 place-items-center rounded-full hover:bg-cream">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -77,7 +105,7 @@ export default function CartDrawer() {
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sand">
                 <div
                   className="h-full rounded-full bg-brand transition-all"
-                  style={{ width: `${Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100)}%` }}
+                  style={{ width: `${Math.min(100, freeShippingThreshold ? (subtotal / freeShippingThreshold) * 100 : 100)}%` }}
                 />
               </div>
             </div>
@@ -85,14 +113,14 @@ export default function CartDrawer() {
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-5">
               {items.map((item) => (
                 <li key={item.id} className="flex gap-4 py-4">
-                  <Link to={`/product/${item.id}`} onClick={close} className="w-20 shrink-0">
+                  <Link to={`/product/${item.slug ?? item.id}`} onClick={close} className="w-20 shrink-0">
                     <ProductImage name={item.name} category={item.category} imageUrl={item.imageUrl} className="aspect-[4/5] rounded-xl" />
                   </Link>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wide text-muted">{item.brand}</p>
-                        <Link to={`/product/${item.id}`} onClick={close} className="line-clamp-2 text-sm font-medium hover:underline">
+                        <Link to={`/product/${item.slug ?? item.id}`} onClick={close} className="line-clamp-2 text-sm font-medium hover:underline">
                           {item.name}
                         </Link>
                       </div>

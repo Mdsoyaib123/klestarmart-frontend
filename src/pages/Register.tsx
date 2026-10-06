@@ -1,6 +1,9 @@
 import { Check, ShieldCheck, Truck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { errorMessage } from '@/api/baseApi'
+import { useGetMeQuery, useRegisterMutation } from '@/features/account/accountApi'
+import { useSiteSettings } from '@/features/settings/settingsApi'
 import Container from '@/components/ui/Container'
 
 const inputClass = 'h-12 w-full rounded-xl border border-line bg-white px-4 text-sm outline-none transition focus:border-brand'
@@ -12,28 +15,39 @@ const benefits = [
 ]
 
 export default function Register() {
-  const [notice, setNotice] = useState(false)
-  const [passwordError, setPasswordError] = useState('')
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+  const { data: me } = useGetMeQuery()
+  const { siteName } = useSiteSettings()
+  const [register, { isLoading }] = useRegisterMutation()
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  if (me) return <Navigate to="/account" replace />
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
+    const text = (name: string) => String(form.get(name) ?? '').trim()
     if (form.get('password') !== form.get('confirmPassword')) {
-      setPasswordError('Your passwords do not match.')
+      setError('Your passwords do not match.')
       return
     }
-    setPasswordError('')
-    setNotice(true)
+    setError('')
+    try {
+      await register({ name: text('name'), phone: text('phone'), email: text('email') || undefined, password: String(form.get('password')) }).unwrap()
+      navigate('/account', { replace: true })
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }
 
   return (
     <Container className="py-10 sm:py-16">
       <div className="mx-auto grid max-w-4xl overflow-hidden rounded-3xl border border-line bg-white shadow-sm md:grid-cols-[0.9fr_1.1fr]">
         <aside className="bg-brand p-7 text-white sm:p-9">
-          <p className="text-sm font-semibold uppercase tracking-widest text-white/70">KlestarMart account</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-white/70">{siteName} account</p>
           <h1 className="mt-4 font-display text-3xl font-semibold leading-tight">Shopping, made a little easier.</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/75">
-            Create an account to keep your orders and favourites together.
+            Create an account to keep your orders and favourites together. Ordered before as a guest? Use the same phone number to see those orders too.
           </p>
           <ul className="mt-8 space-y-4">
             {benefits.map(({ icon: Icon, text }) => (
@@ -83,21 +97,15 @@ export default function Register() {
                 <input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} className={inputClass} />
               </label>
             </div>
-            {passwordError && <p role="alert" className="text-sm text-accent">{passwordError}</p>}
+            {error && <p role="alert" className="rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">{error}</p>}
             <label className="flex items-start gap-2.5 pt-1 text-sm text-muted">
               <input type="checkbox" name="terms" required className="mt-0.5 accent-brand" />
               <span>I agree to the terms of service and privacy policy.</span>
             </label>
-            <button type="submit" className="h-12 w-full rounded-full bg-brand font-semibold text-white transition hover:bg-brand-dark">
-              Create account
+            <button type="submit" disabled={isLoading} className="h-12 w-full rounded-full bg-brand font-semibold text-white transition hover:bg-brand-dark disabled:opacity-70">
+              {isLoading ? 'Creating your account…' : 'Create account'}
             </button>
           </form>
-
-          {notice && (
-            <p role="status" className="mt-5 rounded-xl bg-accent-soft px-4 py-3 text-sm text-accent">
-              Account creation is not available yet. Your details were not saved. You can still place an order as a guest.
-            </p>
-          )}
 
           <p className="mt-6 text-center text-sm text-muted">
             Already have an account? <Link to="/login" className="font-semibold text-brand hover:underline">Log in</Link>

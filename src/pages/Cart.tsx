@@ -39,14 +39,14 @@ export default function Cart() {
         <ul className="divide-y divide-line border-y border-line">
           {items.map((item) => (
             <li key={item.id} className="flex gap-4 py-6 sm:gap-6">
-              <Link to={`/product/${item.id}`} className="w-24 shrink-0 sm:w-32">
+              <Link to={`/product/${item.slug ?? item.id}`} className="w-24 shrink-0 sm:w-32">
                 <ProductImage name={item.name} category={item.category} imageUrl={item.imageUrl} className="aspect-[4/5] rounded-2xl" />
               </Link>
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex justify-between gap-4">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted">{item.brand}</p>
-                    <Link to={`/product/${item.id}`} className="font-medium hover:underline">{item.name}</Link>
+                    <Link to={`/product/${item.slug ?? item.id}`} className="font-medium hover:underline">{item.name}</Link>
                     <p className="mt-1 text-sm text-muted">{formatPrice(item.price)} each</p>
                   </div>
                   <p className="font-semibold">{formatPrice(item.price * item.quantity)}</p>

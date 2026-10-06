@@ -1,16 +1,11 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/app/store'
+import { isString, loadArray } from '@/lib/storage'
 
 export const RECENT_STORAGE_KEY = 'klestar:recent'
 const MAX_RECENT = 8
 
-const load = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
+const load = () => loadArray(RECENT_STORAGE_KEY, isString)
 
 const recentSlice = createSlice({
   name: 'recent',

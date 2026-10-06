@@ -1,15 +1,10 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/app/store'
+import { isString, loadArray } from '@/lib/storage'
 
 export const WISHLIST_STORAGE_KEY = 'klestar:wishlist'
 
-const loadWishlist = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(WISHLIST_STORAGE_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
+const loadWishlist = () => loadArray(WISHLIST_STORAGE_KEY, isString)
 
 const wishlistSlice = createSlice({
   name: 'wishlist',

@@ -5,6 +5,7 @@ import { useGetCategoriesQuery, useGetProductsQuery } from '@/features/catalog/c
 import Container from '@/components/ui/Container'
 import { ProductGrid, ProductGridSkeleton } from '@/components/product/ProductGrid'
 import NotFound from '@/pages/NotFound'
+import LoadError from '@/components/ui/LoadError'
 
 const PAGE_SIZE = 12
 
@@ -28,7 +29,7 @@ export default function Shop() {
   const [showFilters, setShowFilters] = useState(false)
   const [pageState, setPageState] = useState({ key: '', count: PAGE_SIZE })
   const { data: categories = [], isSuccess: categoriesLoaded } = useGetCategoriesQuery()
-  const { data: products = [], isLoading } = useGetProductsQuery()
+  const { data: products = [], isLoading, isError, refetch } = useGetProductsQuery()
 
   const q = params.get('q')?.trim() ?? ''
   const sort = params.get('sort') ?? 'featured'
@@ -82,7 +83,7 @@ export default function Shop() {
 
   const title = category?.name ?? (deals ? 'Sale' : q ? `Results for "${q}"` : 'All products')
   const description = category?.description ?? (deals ? 'Reduced prices on selected favourites.' : 'Browse everything in the store.')
-  const hasFilters = Boolean(price || inStock || brandParam || (deals && !category) || q)
+  const hasFilters = Boolean(price || inStock || brandParam || deals || q)
   const activeBrands = brandParam.split(',').filter(Boolean)
   const optionClass = 'flex items-center gap-2.5 py-1.5 text-sm'
 
@@ -225,6 +226,8 @@ export default function Shop() {
 
           {isLoading ? (
             <ProductGridSkeleton count={PAGE_SIZE} />
+          ) : isError ? (
+            <LoadError onRetry={refetch} />
           ) : results.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line py-20 text-center">
               <p className="font-display text-xl font-semibold">Nothing matches your search</p>

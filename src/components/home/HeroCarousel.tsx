@@ -1,14 +1,15 @@
 import { Banknote, ChevronLeft, ChevronRight, RotateCcw, Truck } from 'lucide-react'
 import { createElement, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { useGetCategoriesQuery, useGetProductsQuery } from '@/features/catalog/catalogApi'
-import { FREE_SHIPPING_THRESHOLD, TAGLINE } from '@/config/site'
+import { useGetBannersQuery, useGetCategoriesQuery, useGetProductsQuery } from '@/features/catalog/catalogApi'
+import { useSiteSettings } from '@/features/settings/settingsApi'
 import { categoryIcon, categoryTone } from '@/lib/category'
 import { discountPercent, formatPrice } from '@/lib/format'
 import Container from '@/components/ui/Container'
 import Price from '@/components/ui/Price'
 import ProductImage from '@/components/product/ProductImage'
 import type { Category } from '@/types/catalog'
+import type { Banner } from '@/types/site'
 
 interface Slide {
   id: string
@@ -23,6 +24,12 @@ interface Slide {
 }
 
 const AUTOPLAY_MS = 6000
+
+const THEMES: Record<Banner['theme'], { background: string; dark: boolean }> = {
+  light: { background: 'bg-gradient-to-br from-cream to-[#d9e4fb]', dark: false },
+  dark: { background: 'bg-gradient-to-br from-[#0a2a8c] to-[#1a47c4]', dark: true },
+  accent: { background: 'bg-gradient-to-br from-accent-soft to-[#ffddc7]', dark: false },
+}
 
 // Entrance animation that replays each time a slide becomes active.
 const reveal = (active: boolean, delay: number, extra = '') => ({
@@ -53,6 +60,8 @@ function CollageTile({ category, className }: { category: Category; className: s
 export default function HeroCarousel() {
   const { data: categories = [] } = useGetCategoriesQuery()
   const { data: products = [] } = useGetProductsQuery()
+  const { data: banners = [] } = useGetBannersQuery()
+  const { tagline, shipping, returnDays } = useSiteSettings()
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const touchStart = useRef<number | null>(null)
@@ -60,7 +69,28 @@ export default function HeroCarousel() {
   const deals = products.filter((product) => product.compareAtPrice && product.stock > 0)
   const biggestDiscount = Math.max(0, ...deals.map((product) => discountPercent(product.price, product.compareAtPrice ?? product.price)))
 
-  const slideBuilders: ((active: boolean) => Slide)[] = [
+  // Banners managed in the dashboard; each becomes one slide.
+  const bannerSlides = banners.map(
+    (banner) =>
+      (active: boolean): Slide => ({
+        id: banner.id,
+        dark: THEMES[banner.theme].dark,
+        background: THEMES[banner.theme].background,
+        eyebrow: banner.eyebrow,
+        title: banner.title,
+        text: banner.text,
+        cta: { label: banner.ctaLabel, to: banner.ctaLink || '/shop' },
+        secondary: banner.secondaryLabel && banner.secondaryLink ? { label: banner.secondaryLabel, to: banner.secondaryLink } : undefined,
+        visual: banner.imageUrl ? (
+          <div {...reveal(active, 150, 'mx-auto w-full max-w-lg')}>
+            <img src={banner.imageUrl} alt="" className="aspect-[4/3] w-full rounded-3xl object-cover shadow-xl shadow-black/15" />
+          </div>
+        ) : null,
+      }),
+  )
+
+  // Built-in slides, shown until banners are added in the dashboard.
+  const defaultSlides: ((active: boolean) => Slide)[] = [
     (active) => ({
       id: 'welcome',
       background: 'bg-gradient-to-br from-cream to-[#d9e4fb]',
@@ -97,7 +127,7 @@ export default function HeroCarousel() {
                 {deals.slice(0, 2).map((product, position) => (
                   <Link
                     key={product.id}
-                    to={`/product/${product.id}`}
+                    to={`/product/${product.slug}`}
                     className={`absolute w-[52%] rounded-3xl bg-paper p-3 text-ink shadow-xl shadow-black/20 transition duration-300 hover:-translate-y-2 hover:rotate-0 ${position === 0 ? 'left-0 top-10 -rotate-4' : 'right-0 top-0 rotate-4'}`}
                   >
                     <ProductImage name={product.name} category={product.category} imageUrl={product.imageUrl} className="aspect-square rounded-2xl" />
@@ -128,12 +158,12 @@ export default function HeroCarousel() {
       cta: { label: 'Start shopping', to: '/shop' },
       visual: (
         <div {...reveal(active, 150, 'mx-auto w-full max-w-md')}>
-          <p className="mb-4 inline-block -rotate-2 rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-white shadow-md">{TAGLINE}</p>
+          <p className="mb-4 inline-block -rotate-2 rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-white shadow-md">{tagline}</p>
           <ul className="space-y-3">
             {[
               { icon: Banknote, title: 'Cash on delivery', text: 'No advance payment needed' },
-              { icon: Truck, title: 'Free delivery', text: `On orders over ${formatPrice(FREE_SHIPPING_THRESHOLD)}` },
-              { icon: RotateCcw, title: 'Easy returns', text: '30 days, no questions asked' },
+              { icon: Truck, title: 'Free delivery', text: `On orders over ${formatPrice(shipping.freeShippingThreshold)}` },
+              { icon: RotateCcw, title: 'Easy returns', text: `${returnDays} days, no questions asked` },
             ].map(({ icon: Icon, title, text }, position) => (
               <li
                 key={title}
@@ -154,6 +184,7 @@ export default function HeroCarousel() {
     }),
   ]
 
+  const slideBuilders = bannerSlides.length > 0 ? bannerSlides : defaultSlides
   const count = slideBuilders.length
   const current = index % count
   const go = (target: number) => setIndex((target + count) % count)
@@ -205,13 +236,18 @@ export default function HeroCarousel() {
 
                 <div className="relative grid items-center gap-10 px-7 pb-28 pt-10 sm:px-10 md:grid-cols-2 md:px-14 md:pb-24 md:pt-14">
                   <div>
-                    <p {...reveal(active, 0, 'mb-5 inline-flex items-center gap-2 rounded-full border border-current/20 px-3.5 py-1.5 text-xs font-medium')}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                      {slide.eyebrow}
-                    </p>
-                    <h1 {...reveal(active, 90, 'font-display text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.4rem]')}>
-                      {slide.title}
-                    </h1>
+                    {slide.eyebrow && (
+                      <p {...reveal(active, 0, 'mb-5 inline-flex items-center gap-2 rounded-full border border-current/20 px-3.5 py-1.5 text-xs font-medium')}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                        {slide.eyebrow}
+                      </p>
+                    )}
+                    {/* Only the visible slide's title is the page's h1. */}
+                    {createElement(
+                      active ? 'h1' : 'h2',
+                      reveal(active, 90, 'font-display text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.4rem]'),
+                      slide.title,
+                    )}
                     <p {...reveal(active, 180, `mt-5 max-w-md text-lg leading-relaxed ${slide.dark ? 'text-white/80' : 'text-muted'}`)}>{slide.text}</p>
                     <div {...reveal(active, 270, 'mt-8 flex flex-wrap gap-3')}>
                       <Link
@@ -237,6 +273,8 @@ export default function HeroCarousel() {
           })}
         </div>
 
+        {/* Controls only make sense with more than one slide. */}
+        {count > 1 && (
         <div className={`absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-4 px-7 pb-6 sm:px-10 md:px-14 md:pb-7 ${dark ? 'text-white' : 'text-ink'}`}>
           <div className="flex items-center gap-2" role="tablist" aria-label="Choose slide">
             {slides.map((slide, position) => (
@@ -275,6 +313,7 @@ export default function HeroCarousel() {
             </button>
           </div>
         </div>
+        )}
       </section>
     </Container>
   )

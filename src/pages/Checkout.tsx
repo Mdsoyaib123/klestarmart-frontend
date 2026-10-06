@@ -1,9 +1,12 @@
 import { Banknote, ChevronLeft, CreditCard, Lock, MapPin, RotateCcw, Truck } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { useAppSelector } from '@/app/hooks'
-import { DELIVERY_RATES, FREE_SHIPPING_THRESHOLD } from '@/config/site'
-import { regionForDistrict, selectCartCount, selectCartItems, selectCartSubtotal, shippingFor } from '@/features/cart/cartSlice'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { errorMessage } from '@/api/baseApi'
+import { useGetMeQuery } from '@/features/account/accountApi'
+import { clearCart, selectCartCount, selectCartItems, selectCartSubtotal } from '@/features/cart/cartSlice'
+import { usePlaceOrderMutation } from '@/features/orders/ordersApi'
+import { deliveryRates, regionForDistrict, shippingFor, useSiteSettings } from '@/features/settings/settingsApi'
 import { districts, type District } from '@/data/bdLocations'
 import { formatPrice } from '@/lib/format'
 import Container from '@/components/ui/Container'
@@ -35,6 +38,7 @@ function Field({
   inputMode,
   maxLength,
   hint,
+  defaultValue,
   required = true,
 }: {
   label: string
@@ -48,6 +52,7 @@ function Field({
   inputMode?: 'text' | 'tel' | 'email' | 'numeric'
   maxLength?: number
   hint?: string
+  defaultValue?: string
   required?: boolean
 }) {
   return (
@@ -65,6 +70,7 @@ function Field({
         inputMode={inputMode}
         maxLength={maxLength}
         required={required}
+        defaultValue={defaultValue}
         className={inputClass}
       />
       {hint && <span className="mt-1.5 block text-xs text-muted">{hint}</span>}
@@ -95,14 +101,20 @@ export default function Checkout() {
   const subtotal = useAppSelector(selectCartSubtotal)
   const [districtName, setDistrictName] = useState('')
   const [upazila, setUpazila] = useState('')
-  const [submissionNotice, setSubmissionNotice] = useState(false)
+  const [error, setError] = useState('')
+  const dispatch = useAppDispatch()
+  const navigate = useNavigate()
+  const settings = useSiteSettings()
+  const { data: me } = useGetMeQuery()
+  const [placeOrderRequest, { isLoading: placing }] = usePlaceOrderMutation()
 
   const district = districts.find((item) => item.name === districtName)
-  const region = district ? regionForDistrict(district.name) : undefined
-  const rate = region ? DELIVERY_RATES[region] : undefined
-  const freeDelivery = subtotal >= FREE_SHIPPING_THRESHOLD
-  const shipping = region || freeDelivery ? shippingFor(subtotal, region) : undefined
-  const remaining = FREE_SHIPPING_THRESHOLD - subtotal
+  const region = district ? regionForDistrict(settings, district.name) : undefined
+  const rate = region ? deliveryRates(settings).find((item) => item.region === region) : undefined
+  const freeDelivery = subtotal >= settings.shipping.freeShippingThreshold
+  const shipping = region || freeDelivery ? shippingFor(settings, subtotal, region) : undefined
+  const remaining = settings.shipping.freeShippingThreshold - subtotal
+  const [defaultRate, outsideRate] = deliveryRates(settings)
 
   const chooseDistrict = (value: string) => {
     setDistrictName(value)
@@ -110,9 +122,23 @@ export default function Checkout() {
     setUpazila('')
   }
 
-  const placeOrder = (event: FormEvent) => {
+  const placeOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSubmissionNotice(true)
+    const form = new FormData(event.currentTarget)
+    const text = (name: string) => String(form.get(name) ?? '').trim()
+    setError('')
+    try {
+      const order = await placeOrderRequest({
+        customer: { name: text('fullName'), phone: text('phone'), email: text('email') || undefined },
+        shippingAddress: { district: districtName, upazila, address: text('address'), note: text('note') || undefined },
+        items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        paymentMethod: 'cod',
+      }).unwrap()
+      dispatch(clearCart())
+      navigate(`/order/${order.orderNumber}`, { replace: true, state: { order } })
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }
 
   if (items.length === 0) {
@@ -135,14 +161,12 @@ export default function Checkout() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-display text-3xl font-semibold sm:text-4xl">Checkout</h1>
         <p className="flex items-center gap-1.5 text-sm text-muted">
-          <Lock className="h-4 w-4" /> Guest checkout, no account needed
+          <Lock className="h-4 w-4" /> {me ? `Signed in as ${me.name}` : 'Guest checkout, no account needed'}
         </p>
       </div>
-      <p role="note" className="mb-8 rounded-2xl border border-accent/20 bg-accent-soft px-5 py-4 text-sm text-ink">
-        Preview only: checkout is not connected. Do not enter real personal details. No order or information will be sent or saved.
-      </p>
 
-      <form onSubmit={placeOrder} className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
+      {/* Keyed by account so the saved name and phone fill in once the profile loads. */}
+      <form key={me?.id ?? 'guest'} onSubmit={placeOrder} className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
         <div className="space-y-6">
           <Step number={1} title="Contact" description="We will call this number to confirm your order.">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -157,14 +181,15 @@ export default function Checkout() {
                 maxLength={11}
                 title="Enter an 11-digit Bangladesh mobile number, for example 01712345678"
                 hint="11 digits, starting with 01"
+                defaultValue={me?.phone}
               />
-              <Field label="Email" name="email" type="email" autoComplete="email" placeholder="you@example.com" hint="For your order receipt" required={false} />
+              <Field label="Email" name="email" type="email" autoComplete="email" placeholder="you@example.com" hint="For your order receipt" required={false} defaultValue={me?.email} />
             </div>
           </Step>
 
           <Step number={2} title="Delivery address" description="Where should we bring your order?">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Full name" name="fullName" autoComplete="name" placeholder="Recipient's name" className="sm:col-span-2" />
+              <Field label="Full name" name="fullName" autoComplete="name" placeholder="Recipient's name" className="sm:col-span-2" defaultValue={me?.name} />
 
               <SelectField label="District" name="district" value={districtName} onChange={chooseDistrict} autoComplete="address-level2">
                 <option value="" disabled>
@@ -227,8 +252,8 @@ export default function Checkout() {
                   <div className="flex items-center gap-4 rounded-2xl border border-dashed border-line p-4 text-sm text-muted">
                     <MapPin className="h-5 w-5 shrink-0" />
                     <span>
-                      Choose your district to see the delivery charge. {DELIVERY_RATES.dhaka.label} {formatPrice(DELIVERY_RATES.dhaka.fee)},{' '}
-                      {DELIVERY_RATES.outside.label.toLowerCase()} {formatPrice(DELIVERY_RATES.outside.fee)}.
+                      Choose your district to see the delivery charge. {defaultRate.label} {formatPrice(defaultRate.fee)},{' '}
+                      {outsideRate.label.toLowerCase()} {formatPrice(outsideRate.fee)}.
                     </span>
                   </div>
                 )}
@@ -305,14 +330,18 @@ export default function Checkout() {
 
           <OrderSummary subtotal={subtotal} shipping={shipping} shippingPending="Select your district" />
 
-          <button type="submit" className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-brand py-3.5 font-semibold text-white transition hover:bg-brand-dark">
+          <button
+            type="submit"
+            disabled={placing}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-brand py-3.5 font-semibold text-white transition hover:bg-brand-dark disabled:cursor-wait disabled:opacity-70"
+          >
             <Lock className="h-4 w-4" />
-            Place order{shipping !== undefined && ` · ${formatPrice(subtotal + shipping)}`}
+            {placing ? 'Placing your order…' : <>Place order{shipping !== undefined && ` · ${formatPrice(subtotal + shipping)}`}</>}
           </button>
 
-          {submissionNotice && (
-            <p role="status" className="mt-4 rounded-xl bg-brand-soft px-4 py-3 text-sm font-medium text-brand">
-              No order was placed. The checkout service is not connected, and your bag is unchanged.
+          {error && (
+            <p role="alert" className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
+              {error}
             </p>
           )}
 
@@ -320,9 +349,11 @@ export default function Checkout() {
             <li className="flex items-center gap-2">
               <Banknote className="h-4 w-4 text-brand" /> Pay in cash when it arrives
             </li>
-            <li className="flex items-center gap-2">
-              <RotateCcw className="h-4 w-4 text-brand" /> 30-day easy returns
-            </li>
+            {settings.returnDays > 0 && (
+              <li className="flex items-center gap-2">
+                <RotateCcw className="h-4 w-4 text-brand" /> {settings.returnDays}-day easy returns
+              </li>
+            )}
           </ul>
         </aside>
       </form>

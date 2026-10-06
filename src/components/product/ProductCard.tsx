@@ -23,7 +23,7 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <article className="group">
       <div className="relative">
-        <Link to={`/product/${product.id}`} className="block rounded-2xl">
+        <Link to={`/product/${product.slug}`} className="block rounded-2xl">
           <ProductImage
             name={product.name}
             category={product.category}
@@ -69,10 +69,10 @@ export default function ProductCard({ product }: { product: Product }) {
 
       <div className="mt-3 space-y-1">
         <p className="text-xs uppercase tracking-wide text-muted">{product.brand}</p>
-        <Link to={`/product/${product.id}`} className="block text-[15px] font-medium leading-snug hover:underline">
+        <Link to={`/product/${product.slug}`} className="block text-[15px] font-medium leading-snug hover:underline">
           {product.name}
         </Link>
-        <Rating value={product.rating} count={product.reviewCount} />
+        {product.reviewCount > 0 && <Rating value={product.rating} count={product.reviewCount} />}
         <Price price={product.price} compareAt={product.compareAtPrice} />
       </div>
     </article>

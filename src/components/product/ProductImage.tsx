@@ -4,7 +4,7 @@ import { categoryIcon, categoryTone } from '@/lib/category'
 interface Props {
   name: string
   category: string
-  imageUrl?: string
+  imageUrl?: string | null
   className?: string
 }
 

@@ -7,7 +7,7 @@ import { addItem } from '@/features/cart/cartSlice'
 import { selectRecentIds, viewProduct } from '@/features/recent/recentSlice'
 import { openCart } from '@/features/ui/uiSlice'
 import { selectWishlistIds, toggleWishlist } from '@/features/wishlist/wishlistSlice'
-import { DELIVERY_RATES, FREE_SHIPPING_THRESHOLD, SITE_NAME } from '@/config/site'
+import { deliveryRates, useSiteSettings } from '@/features/settings/settingsApi'
 import { discountPercent, formatPrice, formatShortDate } from '@/lib/format'
 import Container from '@/components/ui/Container'
 import Price from '@/components/ui/Price'
@@ -18,24 +18,18 @@ import ProductTabs from '@/components/product/ProductTabs'
 import ReviewsSection from '@/components/product/ReviewsSection'
 import { ProductGrid } from '@/components/product/ProductGrid'
 import NotFound from '@/pages/NotFound'
+import LoadError from '@/components/ui/LoadError'
 import type { Product } from '@/types/catalog'
 
-const today = new Date()
-
+// Uses the current date on each render so the estimate stays right if the tab is left open overnight.
 const arrival = ([from, to]: readonly [number, number]) => {
   const day = (offset: number) => {
-    const date = new Date(today)
+    const date = new Date()
     date.setDate(date.getDate() + offset)
     return formatShortDate(date)
   }
   return `${day(from)} - ${day(to)}`
 }
-
-const trust = [
-  { icon: ShieldCheck, label: '100% authentic' },
-  { icon: RotateCcw, label: '30-day returns' },
-  { icon: Banknote, label: 'Cash on delivery' },
-]
 
 function ProductView({ product }: { product: Product }) {
   const dispatch = useAppDispatch()
@@ -44,6 +38,12 @@ function ProductView({ product }: { product: Product }) {
   const { data: all = [] } = useGetProductsQuery()
   const wished = useAppSelector(selectWishlistIds).includes(product.id)
   const recentIds = useAppSelector(selectRecentIds)
+  const settings = useSiteSettings()
+  const trust = [
+    { icon: ShieldCheck, label: '100% authentic' },
+    ...(settings.returnDays > 0 ? [{ icon: RotateCcw, label: `${settings.returnDays}-day returns` }] : []),
+    { icon: Banknote, label: 'Cash on delivery' },
+  ]
   const [quantity, setQuantity] = useState(1)
   const [copied, setCopied] = useState(false)
 
@@ -57,16 +57,16 @@ function ProductView({ product }: { product: Product }) {
 
   const soldOut = product.stock === 0
   const lowStock = !soldOut && product.stock <= 5
-  const badge = product.compareAtPrice ? `${discountPercent(product.price, product.compareAtPrice)}% off` : product.badge
+  const badge = product.compareAtPrice ? `${discountPercent(product.price, product.compareAtPrice)}% off` : (product.badge ?? undefined)
 
   useEffect(() => {
     dispatch(viewProduct(product.id))
     const previous = document.title
-    document.title = `${product.name} | ${SITE_NAME}`
+    document.title = `${product.name} | ${settings.siteName}`
     return () => {
       document.title = previous
     }
-  }, [dispatch, product.id, product.name])
+  }, [dispatch, product.id, product.name, settings.siteName])
 
   const addToBag = () => {
     dispatch(addItem({ product, quantity }))
@@ -74,7 +74,7 @@ function ProductView({ product }: { product: Product }) {
   }
 
   const buyNow = () => {
-    dispatch(addItem({ product, quantity }))
+    dispatch(addItem({ product, quantity, replace: true }))
     navigate('/checkout')
   }
 
@@ -100,7 +100,8 @@ function ProductView({ product }: { product: Product }) {
     sku: product.sku,
     description: product.description,
     brand: { '@type': 'Brand', name: product.brand },
-    aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.reviewCount },
+    // Search engines reject a rating with no reviews behind it.
+    ...(product.reviewCount > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.reviewCount } } : {}),
     offers: {
       '@type': 'Offer',
       priceCurrency: 'BDT',
@@ -144,11 +145,11 @@ function ProductView({ product }: { product: Product }) {
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Price price={product.price} compareAt={product.compareAtPrice} large />
-            {product.compareAtPrice && (
+            {product.compareAtPrice ? (
               <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
                 You save {formatPrice(product.compareAtPrice - product.price)}
               </span>
-            )}
+            ) : null}
           </div>
 
           <p className="mt-5 leading-relaxed text-muted">{product.description}</p>
@@ -213,7 +214,7 @@ function ProductView({ product }: { product: Product }) {
               <Truck className="h-5 w-5 text-brand" /> Delivery
             </p>
             <ul className="space-y-3 text-sm">
-              {Object.values(DELIVERY_RATES).map((rate) => (
+              {deliveryRates(settings).map((rate) => (
                 <li key={rate.label} className="flex justify-between gap-4">
                   <span>
                     <span className="font-medium">{rate.label}</span>
@@ -224,11 +225,11 @@ function ProductView({ product }: { product: Product }) {
               ))}
             </ul>
             <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
-              Free delivery on orders over {formatPrice(FREE_SHIPPING_THRESHOLD)}. Pay with cash on delivery.
+              Free delivery on orders over {formatPrice(settings.shipping.freeShippingThreshold)}. Pay with cash on delivery.
             </p>
           </div>
 
-          <ul className="mt-5 grid grid-cols-3 gap-3 text-center text-xs font-medium">
+          <ul className={`mt-5 grid gap-3 text-center text-xs font-medium ${trust.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
             {trust.map(({ icon: Icon, label }) => (
               <li key={label} className="flex flex-col items-center gap-2 rounded-2xl bg-cream px-2 py-3">
                 <Icon className="h-5 w-5 text-brand" strokeWidth={1.7} />
@@ -275,9 +276,10 @@ function ProductView({ product }: { product: Product }) {
 
 export default function ProductDetail() {
   const { id = '' } = useParams()
-  const { data: product, isLoading } = useGetProductByIdQuery(id)
+  // `currentData` belongs to this id only; `data` would keep showing the previous product while the next one loads.
+  const { currentData: product, isFetching, error, refetch } = useGetProductByIdQuery(id)
 
-  if (isLoading) {
+  if (isFetching && !product) {
     return (
       <Container className="grid animate-pulse gap-10 py-12 md:grid-cols-2">
         <div className="aspect-square rounded-3xl bg-sand/70" />
@@ -291,6 +293,14 @@ export default function ProductDetail() {
     )
   }
 
+  // Only a 404 means the product does not exist; anything else is a connection problem.
+  if (!product && error && 'status' in error && error.status !== 404) {
+    return (
+      <Container className="py-12">
+        <LoadError onRetry={refetch} />
+      </Container>
+    )
+  }
   if (!product) return <NotFound />
 
   return <ProductView key={product.id} product={product} />

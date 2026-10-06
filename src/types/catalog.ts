@@ -1,27 +1,29 @@
 export interface Category {
+  id?: string
   slug: string
   name: string
   description: string
   highlights: string[]
-  imageUrl?: string
+  imageUrl?: string | null
 }
 
 export interface Product {
   id: string
+  slug: string
   sku: string
   name: string
   brand: string
   description: string
   specs: [label: string, value: string][]
   price: number
-  compareAtPrice?: number
+  compareAtPrice?: number | null
   category: string
   rating: number
   reviewCount: number
   stock: number
-  imageUrl?: string
+  imageUrl?: string | null
   images?: string[]
-  badge?: 'New' | 'Sale' | 'Bestseller'
+  badge?: 'New' | 'Sale' | 'Bestseller' | null
 }
 
 export interface Review {

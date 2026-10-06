@@ -1,42 +1,27 @@
-import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query/react'
-import { categories, products } from '@/data/catalog'
-import { generateReviews } from '@/data/reviews'
-import type { Category, Product, Review } from '@/types/catalog'
+import { baseApi } from '@/api/baseApi'
+import type { Category, Product } from '@/types/catalog'
+import type { ApiResponse, Banner } from '@/types/site'
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-// Mock endpoints; swap `fakeBaseQuery` for `fetchBaseQuery` once the backend exposes these routes.
-export const catalogApi = createApi({
-  reducerPath: 'catalogApi',
-  baseQuery: fakeBaseQuery<string>(),
+export const catalogApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCategories: builder.query<Category[], void>({
-      queryFn: async () => {
-        await wait(150)
-        return { data: categories }
-      },
+      query: () => '/categories',
+      transformResponse: (response: ApiResponse<Category[]>) => response.data,
     }),
     getProducts: builder.query<Product[], void>({
-      queryFn: async () => {
-        await wait(350)
-        return { data: products }
-      },
+      query: () => '/products',
+      transformResponse: (response: ApiResponse<Product[]>) => response.data,
     }),
+    // Accepts a product slug or id.
     getProductById: builder.query<Product, string>({
-      queryFn: async (id) => {
-        await wait(250)
-        const product = products.find((item) => item.id === id)
-        return product ? { data: product } : { error: 'Product not found' }
-      },
+      query: (idOrSlug) => `/products/${encodeURIComponent(idOrSlug)}`,
+      transformResponse: (response: ApiResponse<Product>) => response.data,
     }),
-    getReviews: builder.query<Review[], string>({
-      queryFn: async (id) => {
-        await wait(300)
-        const product = products.find((item) => item.id === id)
-        return product ? { data: generateReviews(product) } : { error: 'Product not found' }
-      },
+    getBanners: builder.query<Banner[], void>({
+      query: () => '/banners',
+      transformResponse: (response: ApiResponse<Banner[]>) => response.data,
     }),
   }),
 })
 
-export const { useGetCategoriesQuery, useGetProductsQuery, useGetProductByIdQuery, useGetReviewsQuery } = catalogApi
+export const { useGetCategoriesQuery, useGetProductsQuery, useGetProductByIdQuery, useGetBannersQuery } = catalogApi
